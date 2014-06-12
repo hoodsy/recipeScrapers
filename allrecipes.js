@@ -1,5 +1,6 @@
+// results sent to output.json, console
 // NEED TO:
-// change overall outputs to JSON
+// 
 // add positive/critical review functions
 // add nutrition function
 
@@ -7,90 +8,92 @@
 
 var request = require('request');
 var cheerio = require('cheerio');
+var fs = require('fs');
 
 
-//
-// retrieves the ingredients (and quantity) of a recipe
-//
-function getIngredients(recipe){
-  var url = 'http://www.allrecipes.com/Recipe/' + recipe.replace(' ','-');
-  request(url, function(err, resp, body) {
-    console.log('-------')
-    console.log('Ingredients: ')
-    // create a DOM of the provided response body
-    $ = cheerio.load(body);
-    // each ingredient / amount has the <p> tag and class='fl-ing'
-    $("p.fl-ing").each(function(){
-      var ingredients = ""
-      // combine each ingredient/quantity into one line
-      $(this).find('span').each(function(){
-          ingredients += $(this).text()
-      })
-      console.log(ingredients)
+
+// adds each ingredient as an 'id' obj in json
+function getIngredients($){
+  // each ingredient / amount has the <p> tag and class='fl-ing'
+  var json = {id: {}}
+  $("p.fl-ing").each(function(i){
+    var ingredients = ""
+    // combine each ingredient/quantity into one line
+    $(this).find('span').each(function(){
+        ingredients += $(this).text()
     })
+    json.id[i] = ingredients
   })
+  return JSON.stringify(json)
 }
 
-//
+
 // retrieves the rating and # of reviews of a recipe
-//
-function getRating(recipe){
-  var url = 'http://www.allrecipes.com/Recipe/' + recipe.replace(' ','-');
-  request(url, function(err, resp, body) {
-    console.log('-------')
-    // create a DOM of the provided response body
-    $ = cheerio.load(body);
-    // get rating value (rounded) and # of reviews
-    var rating = "Rating: " + $('meta[itemprop="ratingValue"]').attr('content').substring(0,4)
-    rating += ", " + $('span[itemprop="reviewCount"]').text() + " reviews"
-    console.log(rating)
+function getRating($){
+  return JSON.stringify({
+    value: $('meta[itemprop="ratingValue"]').attr('content').substring(0,4),
+    number: $('span[itemprop="reviewCount"]').text()
   })
 }
 
-//
+
 // retrieves the cooking directions
-//
-function getInstructions(recipe){
-  var url = 'http://www.allrecipes.com/Recipe/' + recipe.replace(' ','-');
-  request(url, function(err, resp, body) {
-    console.log('-------')
-    console.log('Directions: ')
-    // create a DOM of the provided response body
-    $ = cheerio.load(body);
-    var instructions = $("div[itemprop='recipeInstructions']")
-    $(instructions).find('span').each(function(){
-      console.log($(this).text())
-    })
+function getInstructions($){
+  var json = {id: {}}
+  $("div[itemprop='recipeInstructions']").find('span').each(function(i){
+    json.id[i] = $(this).text()
   })
+  return JSON.stringify(json)
 }
 
-//
+
 // retrieves the prep, cook, and total time to make recipe
+//  id 2,3 are the TOTAL time
+function getCookTime($){
+  var json = {id: {}}
+  $('div[id="divRecipeTimesContainer"]').find('span').each(function(i){
+    json.id[i] = $(this).text()
+  })
+  return JSON.stringify(json)
+}
+
+
 //
-function getCookTime(recipe){
-  var url = 'http://www.allrecipes.com/Recipe/' + recipe.replace(' ','-');
-  request(url, function(err, resp, body) {
-    console.log('-------')
-    console.log('Cook Time: ')
-    // create a DOM of the provided response body
-    $ = cheerio.load(body);
-    var times = $('div[id="divRecipeTimesContainer"]')
-    $(times).find('span').each(function(i){
-      var labels = ['Prep: ','Cook: ','Total: ', 'Total: ']
-      console.log(labels[i] + $(this).text())
-    })
+// IN PROGRESS
+//
+function getPosReview($){
+  console.log('-------')
+  console.log('Most Helpful Positive Review: ')
+  var rating = $('div')
+  $(times).find('span').each(function(i){
+    var labels = ['Prep: ','Cook: ','Total: ', 'Total: ']
+    console.log(labels[i] + $(this).text())
   })
 }
 
+
+// parse recipe provided, return JSON of all functions
 //
-// runs functions that output info on the selected recipe
-//
-function recipeInfo(recipe){
+function recipeInfo(recipe) {
   console.log('*********************************')
   console.log('Recipe Selected: ' + recipe)
-  getRating(recipe)
-  getCookTime(recipe)
-  getIngredients(recipe)
-  getInstructions(recipe)
+  var url = 'http://www.allrecipes.com/Recipe/' + recipe.replace(' ','-');
+
+  request(url, function(err, resp, body) {
+   // create a DOM of the provided response body, call other scrapers
+    $ = cheerio.load(body);
+
+    var json = {
+      rating: getRating($),
+      time: getCookTime($),
+      ingredients: getIngredients($),
+      instructions: getInstructions($)
+    }
+    
+    var stringed = JSON.stringify(json, null, 4)
+    console.log(JSON.parse(stringed))
+    fs.writeFile('output.json', JSON.stringify(json, null, 4), function(err){})
+  })
 }
+
 recipeInfo('chicken-pot-pie-ix')
